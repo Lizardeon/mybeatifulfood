@@ -1,8 +1,9 @@
 import os
 from datetime import datetime, date, timedelta
-from flask import Flask, render_template, request, redirect, url_for, flash
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
 from flask_sqlalchemy import SQLAlchemy
 import sass
+import requests
 
 app = Flask(__name__)
 app.secret_key = 'your-secret-key-here'
@@ -27,222 +28,131 @@ def compile_scss():
         print("✅ SCSS скомпилирован в CSS")
 
 
-with app.app_context():
-    compile_scss()
-    db.create_all()
-
-
-# ============================================================
-# МОДЕЛЬ
-# ============================================================
 class Product(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
     quantity = db.Column(db.Float, nullable=False, default=1.0)
     unit = db.Column(db.String(20), nullable=False, default='шт')
-    expiration_date = db.Column(db.Date, nullable=True)
-    manufacture_date = db.Column(db.Date, nullable=True)
     category = db.Column(db.String(50), nullable=True)
-    date_added = db.Column(db.DateTime, default=datetime.utcnow)
+    manufacture_date = db.Column(db.Date, nullable=True)
+    expiration_date = db.Column(db.Date, nullable=True)
 
     @property
-    def is_expired(self) -> bool:
-        """Проверяет, просрочен ли продукт."""
-        if not self.expiration_date:
-            return False
-        return self.expiration_date < date.today()
-
-    @property
-    def days_left(self) -> int | None:
-        """Возвращает количество дней до истечения срока годности."""
-        if not self.expiration_date:
-            return None
-        return (self.expiration_date - date.today()).days
-
-    @property
-    def expiry_status(self) -> dict:
-        """Возвращает статус срока годности: цвет, класс, текст."""
-        days = self.days_left
-        if days is None:
-            return {'color': 'secondary', 'class': 'secondary', 'text': 'Не указан'}
-        if days < 0:
-            return {'color': 'danger', 'class': 'danger', 'text': f'Просрочен на {-days} дн.'}
-        if days == 0:
-            return {'color': 'warning', 'class': 'warning', 'text': 'Сегодня'}
-        if days <= 3:
-            return {'color': 'warning', 'class': 'warning', 'text': f'{days} дн.'}
-        return {'color': 'success', 'class': 'success', 'text': f'{days} дн.'}
-
-    @property
-    def expiry_bar_width(self) -> int:
-        """Ширина прогресс-бара (от 0 до 100%)."""
-        days = self.days_left
-        if days is None:
-            return 0
-        if days < 0:
-            return 100
-        if days > 30:
-            return 100
-        return int((days / 30) * 100)
-
-    @classmethod
-    def from_form(cls, form_data):
-        """Создаёт продукт из данных формы с валидацией."""
-        name = form_data.get('name', '').strip()
-        if not name:
-            raise ValueError('Название продукта обязательно')
-
-        try:
-            quantity = float(form_data.get('quantity', 1.0))
-        except ValueError:
-            raise ValueError('Количество должно быть числом')
-
-        if quantity <= 0:
-            raise ValueError('Количество должно быть положительным')
-
-        unit = form_data.get('unit', 'шт')
-        category = form_data.get('category', 'Без категории').strip() or 'Без категории'
-
-        # Обработка дат
-        manufacture_date = cls._parse_date(form_data.get('manufacture_date'))
-        expiration_type = form_data.get('expiration_type', 'date')
-        expiration_date = None
-
-        if expiration_type == 'date':
-            expiration_date = cls._parse_date(form_data.get('expiration_date'))
-            if not expiration_date:
-                raise ValueError('Укажите дату годности')
-        elif expiration_type == 'from_manufacture':
-            days_str = form_data.get('expiration_days', '').strip()
-            if not days_str:
-                raise ValueError('Укажите количество дней хранения')
-            try:
-                days = int(days_str)
-            except ValueError:
-                raise ValueError('Количество дней должно быть целым числом')
-            if days <= 0:
-                raise ValueError('Количество дней должно быть положительным')
-            if not manufacture_date:
-                raise ValueError('Для расчёта от даты изготовления укажите дату изготовления')
-            expiration_date = manufacture_date + timedelta(days=days)
-
-        return cls(
-            name=name,
-            quantity=quantity,
-            unit=unit,
-            category=category,
-            manufacture_date=manufacture_date,
-            expiration_date=expiration_date
-        )
-
-    @staticmethod
-    def _parse_date(date_str: str) -> date | None:
-        """Парсит строку в дату или возвращает None."""
-        if not date_str:
-            return None
-        try:
-            return datetime.strptime(date_str, '%Y-%m-%d').date()
-        except ValueError:
-            return None
+    def days_left(self):
+        if self.expiration_date:
+            delta = self.expiration_date - date.today()
+            return delta.days
+        return None
 
     def update_from_form(self, form_data):
-        """Обновляет продукт из данных формы."""
-        self.name = form_data.get('name', '').strip()
-        if not self.name:
-            raise ValueError('Название продукта обязательно')
-
-        try:
-            self.quantity = float(form_data.get('quantity', 1.0))
-        except ValueError:
-            raise ValueError('Количество должно быть числом')
-
-        if self.quantity <= 0:
-            raise ValueError('Количество должно быть положительным')
-
+        self.name = form_data.get('name')
+        self.quantity = float(form_data.get('quantity') or 1.0)
         self.unit = form_data.get('unit', 'шт')
-        self.category = form_data.get('category', 'Без категории').strip() or 'Без категории'
+        self.category = form_data.get('category') or None
 
-        self.manufacture_date = self._parse_date(form_data.get('manufacture_date'))
+        m_date_str = form_data.get('manufacture_date')
+        self.manufacture_date = datetime.strptime(m_date_str, '%Y-%m-%d').date() if m_date_str else None
 
-        expiration_type = form_data.get('expiration_type', 'date')
-        if expiration_type == 'date':
-            self.expiration_date = self._parse_date(form_data.get('expiration_date'))
-            if not self.expiration_date:
-                raise ValueError('Укажите дату годности')
-        elif expiration_type == 'from_manufacture':
-            days_str = form_data.get('expiration_days', '').strip()
-            if not days_str:
-                raise ValueError('Укажите количество дней хранения')
-            try:
-                days = int(days_str)
-            except ValueError:
-                raise ValueError('Количество дней должно быть целым числом')
-            if days <= 0:
-                raise ValueError('Количество дней должно быть положительным')
-            if not self.manufacture_date:
-                raise ValueError('Для расчёта от даты изготовления укажите дату изготовления')
+        exp_type = form_data.get('expiration_type')
+        if exp_type == 'date':
+            exp_date_str = form_data.get('expiration_date')
+            self.expiration_date = datetime.strptime(exp_date_str, '%Y-%m-%d').date() if exp_date_str else None
+        elif exp_type == 'from_manufacture' and self.manufacture_date:
+            days = int(form_data.get('expiration_days') or 7)
             self.expiration_date = self.manufacture_date + timedelta(days=days)
+        else:
+            self.expiration_date = None
 
 
-# ============================================================
-# ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
-# ============================================================
-def get_alerts(products):
-    """Собирает предупреждения о просроченных и скоро истекающих продуктах."""
-    today = date.today()
-    expired = []
-    warning = []
-
-    for p in products:
-        if not p.expiration_date:
-            continue
-        days = (p.expiration_date - today).days
-        if days < 0:
-            expired.append(p)
-        elif 0 <= days <= 3:
-            warning.append((p, days))
-
-    return expired, warning
+with app.app_context():
+    compile_scss()
+    db.create_all()
 
 
-def flash_errors(form_errors):
-    """Выводит все ошибки формы как flash-сообщения."""
-    for error in form_errors:
-        flash(error, 'danger')
-
-
-# ============================================================
-# МАРШРУТЫ
-# ============================================================
 @app.route('/', methods=['GET', 'POST'])
 def index():
     if request.method == 'POST':
         try:
-            product = Product.from_form(request.form)
+            product = Product()
+            product.update_from_form(request.form)
             db.session.add(product)
             db.session.commit()
-            flash(f'✅ Продукт "{product.name}" добавлен!', 'success')
-        except ValueError as e:
-            flash(str(e), 'danger')
+            flash(f'✨ Продукт "{product.name}" успешно добавлен!', 'success')
+        except Exception as e:
+            db.session.rollback()
+            flash(f'❌ Ошибка при добавлении продукта: {e}', 'danger')
         return redirect(url_for('index'))
 
-    products = Product.query.order_by(Product.date_added.desc()).all()
-    expired, warning = get_alerts(products)
+    products = Product.query.order_by(Product.expiration_date.asc().nullslast()).all()
+    
+    expired_products = [p for p in products if p.days_left is not None and p.days_left < 0]
+    warning_products = [p for p in products if p.days_left is not None and 0 <= p.days_left <= 3]
 
-    return render_template(
-        'index.html',
-        products=products,
-        expired_products=expired,
-        warning_products=warning
-    )
+    return render_template('index.html', 
+                           products=products, 
+                           expired_products=expired_products, 
+                           warning_products=warning_products,
+                           now=date.today())
 
 
-@app.route('/use/<int:product_id>', methods=['POST'])
-def use_product(product_id):
-    product = Product.query.get_or_404(product_id)
+@app.route('/api/search-food', methods=['GET'])
+def search_food():
+    """Эндпоинт для живого поиска продуктов по базе Open Food Facts."""
+    query = request.args.get('q', '').strip()
+    if not query or len(query) < 2:
+        return jsonify([])
 
+    # Используем российское зеркало базы для более точных совпадений
+    url = "https://ru.openfoodfacts.org/cgi/search.pl"
+    params = {
+        'search_terms': query,
+        'search_simple': 1,
+        'action': 'process',
+        'json': 1,
+        'page_size': 6
+    }
+    
     try:
-        amount = float(request.form.get('use_amount', 1.0))
+        headers = {'User-Agent': 'SmartFridgeApp - Web - Version 1.0'}
+        response = requests.get(url, params=params, headers=headers, timeout=4)
+        if response.status_code == 200:
+            data = response.json()
+            products = data.get('products', [])
+            
+            results = []
+            for p in products:
+                name = p.get('product_name_ru') or p.get('product_name')
+                if not name:
+                    continue
+                
+                # Попробуем вытащить категорию на русском или отформатировать базовый тег
+                category = 'Разное'
+                categories = p.get('categories_tags', [])
+                if categories:
+                    category = categories[0].split(':')[-1].replace('-', ' ').capitalize()
+                    # Небольшой маппинг для адекватных категорий
+                    category_map = {
+                        'Milks': 'Молочные продукты', 'Cheeses': 'Сыры', 'Beverages': 'Напитки',
+                        'Groceries': 'Бакалея', 'Snacks': 'Снеки', 'Meats': 'Мясо', 'Yogurts': 'Йогурты'
+                    }
+                    category = category_map.get(category, category)
+
+                results.append({
+                    'name': name,
+                    'category': category
+                })
+            return jsonify(results)
+    except Exception as e:
+        print(f"Ошибка при работе с внешним API: {e}")
+        
+    return jsonify([])
+
+
+@app.route('/consume/<int:product_id>', methods=['POST'])
+def consume_product(product_id):
+    product = Product.query.get_or_404(product_id)
+    try:
+        amount = float(request.form.get('amount', 1))
     except ValueError:
         flash('Введите корректное количество для списания', 'danger')
         return redirect(url_for('index'))
@@ -279,10 +189,11 @@ def edit_product(product_id):
         try:
             product.update_from_form(request.form)
             db.session.commit()
-            flash(f'✅ Продукт "{product.name}" обновлён!', 'success')
+            flash(f'✏️ Продукт "{product.name}" обновлен', 'success')
             return redirect(url_for('index'))
-        except ValueError as e:
-            flash(str(e), 'danger')
+        except Exception as e:
+            db.session.rollback()
+            flash(f'❌ Ошибка при изменении: {e}', 'danger')
 
     return render_template('edit.html', product=product)
 
