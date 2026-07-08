@@ -38,7 +38,7 @@ class Product(db.Model):
     manufacture_date = db.Column(db.Date, nullable=True)
     expiration_date = db.Column(db.Date, nullable=True)
     
-    # Новые поля для КБЖУ
+    # КБЖУ
     calories = db.Column(db.Integer, nullable=True, default=0)
     proteins = db.Column(db.Float, nullable=True, default=0.0)
     fats = db.Column(db.Float, nullable=True, default=0.0)
@@ -57,7 +57,6 @@ class Product(db.Model):
         self.unit = form_data.get('unit', 'шт')
         self.category = form_data.get('category') or 'Разное'
         
-        # КБЖУ
         self.calories = int(form_data.get('calories') or 0)
         self.proteins = float(form_data.get('proteins') or 0.0)
         self.fats = float(form_data.get('fats') or 0.0)
@@ -82,20 +81,9 @@ with app.app_context():
     db.create_all()
 
 
-@app.route('/', methods=['GET', 'POST'])
+# 1. СТРАНИЦА С ТАБЛИЦЕЙ (ГЛАВНАЯ)
+@app.route('/')
 def index():
-    if request.method == 'POST':
-        try:
-            product = Product()
-            product.update_from_form(request.form)
-            db.session.add(product)
-            db.session.commit()
-            flash(f'✨ Продукт "{product.name}" успешно добавлен!', 'success')
-        except Exception as e:
-            db.session.rollback()
-            flash(f'❌ Ошибка при добавлении продукта: {e}', 'danger')
-        return redirect(url_for('index'))
-
     products = Product.query.order_by(Product.expiration_date.asc().nullslast()).all()
     
     expired_products = [p for p in products if p.days_left is not None and p.days_left < 0]
@@ -108,6 +96,26 @@ def index():
                            now=date.today())
 
 
+# 2. СТРАНИЦА ДОБАВЛЕНИЯ ПРОДУКТА
+@app.route('/add', methods=['GET', 'POST'])
+def add_product_page():
+    if request.method == 'POST':
+        try:
+            product = Product()
+            product.update_from_form(request.form)
+            db.session.add(product)
+            db.session.commit()
+            flash(f'✨ Продукт "{product.name}" успешно добавлен!', 'success')
+            return redirect(url_for('index'))  # После добавления возвращаем к таблице
+        except Exception as e:
+            db.session.rollback()
+            flash(f'❌ Ошибка при добавлении продукта: {e}', 'danger')
+            return redirect(url_for('add_product_page'))
+
+    return render_template('add.html')
+
+
+# АПИ ДЛЯ ЖИВОГО ПОИСКА
 @app.route('/api/search-food', methods=['GET'])
 def search_food():
     query = request.args.get('q', '').strip().lower()
@@ -117,7 +125,6 @@ def search_food():
     results = []
     seen_names = set()
 
-    # Поиск по JSON-справочнику
     try:
         if os.path.exists('food_db.json'):
             with open('food_db.json', 'r', encoding='utf-8') as f:
@@ -187,4 +194,6 @@ def edit_product(product_id):
 
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    # host='0.0.0.0' открывает доступ для устройств в локальной сети
+    # port=5000 задает стандартный порт (можно изменить при необходимости)
+    app.run(host='0.0.0.0', port=5000, debug=True)
