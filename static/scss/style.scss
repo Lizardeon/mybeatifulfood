@@ -1,0 +1,243 @@
+// ============================================================
+// ПЕРЕОПРЕДЕЛЕНИЕ КЛАССОВ BOOTSTRAP
+// ============================================================
+
+$primary: #2c7a7b;
+$primary-dark: #1a5c5d;
+$primary-light: #e6f7f7;
+$success: #38a169;
+$danger: #e53e3e;
+$warning: #d69e2e;
+$light: #f7fafc;
+$dark: #2d3748;
+
+// ============================================================
+// БАЗОВЫЕ КНОПКИ
+// ============================================================
+
+.btn-primary {
+    background-color: $primary !important;
+    border-color: $primary !important;
+
+    &:hover {
+        background-color: $primary-dark !important;
+        border-color: $primary-dark !important;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 6px -1px rgba($primary, 0.3) !important;
+    }
+}
+
+.btn-outline-primary {
+    color: $primary !important;
+    border-color: $primary !important;
+
+    &:hover {
+        background-color: $primary !important;
+        color: white !important;
+        border-color: $primary !important;
+    }
+}
+
+// ============================================================
+// BTN-CHECK (переключатели)
+// ============================================================
+
+// Обычное состояние (неактивное)
+.btn-check + .btn-outline-primary {
+    color: $primary !important;
+    background-color: transparent !important;
+    border-color: $primary !important;
+
+    &:hover {
+        background-color: $primary !important;
+        color: white !important;
+        border-color: $primary !important;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 6px -1px rgba($primary, 0.3);
+    }
+}
+
+// Активное состояние (выбранный переключатель)
+.btn-check:checked + .btn-outline-primary {
+    background-color: $primary !important;
+    color: white !important;
+    border-color: $primary !important;
+    box-shadow: 0 0 0 3px rgba($primary, 0.3) !important;
+
+    &:hover {
+        background-color: $primary-dark !important;
+        border-color: $primary-dark !important;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 6px -1px rgba($primary, 0.3) !important;
+    }
+}
+
+// Фокус на кнопке-переключателе
+.btn-check:focus + .btn-outline-primary {
+    box-shadow: 0 0 0 3px rgba($primary, 0.3) !important;
+}
+
+// ============================================================
+// ТАБЛИЦЫ
+// ============================================================
+
+.table {
+    thead th {
+        background-color: $primary-light !important;
+        color: $primary-dark !important;
+        border-bottom: 2px solid $primary !important;
+    }
+
+    tbody tr.table-danger {
+        background-color: #fff5f5 !important;
+    }
+}
+
+// ============================================================
+// КАРТОЧКИ
+// ============================================================
+
+.card {
+    border: none !important;
+    border-radius: 12px !important;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1) !important;
+
+    .card-header {
+        background: linear-gradient(135deg, $primary 0%, $primary-dark 100%) !important;
+        color: white !important;
+        border-radius: 12px 12px 0 0 !important;
+    }
+}
+
+// ============================================================
+// ПРОГРЕСС-БАРЫ
+// ============================================================
+
+.progress {
+    height: 6px !important;
+    background-color: #e2e8f0 !important;
+}
+
+// ============================================================
+// АЛЕРТЫ
+// ============================================================
+
+.alert {
+    border: none !important;
+    border-radius: 12px !important;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1) !important;
+}
+
+// ============================================================
+// СТАТУС СРОКА ГОДНОСТИ
+// ============================================================
+
+.status-badge {
+    padding: 0.25rem 0.75rem !important;
+    border-radius: 20px !important;
+    font-size: 0.75rem !important;
+    font-weight: 600 !important;
+    display: inline-block !important;
+
+    &.success {
+        background-color: #c6f6d5 !important;
+        color: #22543d !important;
+    }
+    &.warning {
+        background-color: #fefcbf !important;
+        color: #744210 !important;
+    }
+    &.danger {
+        background-color: #fed7d7 !important;
+        color: #742a2a !important;
+    }
+    &.secondary {
+        background-color: #e2e8f0 !important;
+        color: #2d3748 !important;
+    }
+}
+
+// ============================================================
+// КАСТОМНЫЙ СКРОЛЛБАР
+// ============================================================
+
+::-webkit-scrollbar {
+    width: 8px;
+}
+::-webkit-scrollbar-track {
+    background: #f0f7f7;
+}
+::-webkit-scrollbar-thumb {
+    background: $primary;
+    border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: $primary-dark;
+}
+
+// ============================================================
+// АНИМАЦИИ
+// ============================================================
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.alert {
+    animation: fadeIn 0.3s ease-out;
+}
+
+// ============================================================
+// МОБИЛЬНАЯ АДАПТАЦИЯ
+// ============================================================
+
+@media (max-width: 768px) {
+    .table thead {
+        display: none !important;
+    }
+
+    .table,
+    .table tbody,
+    .table tr,
+    .table td {
+        display: block !important;
+        width: 100% !important;
+    }
+
+    .table tr {
+        margin-bottom: 1rem !important;
+        border: 1px solid #e2e8f0 !important;
+        border-radius: 12px !important;
+        padding: 0.5rem 0.75rem !important;
+        background: white !important;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1) !important;
+    }
+
+    .table td {
+        border: none !important;
+        padding: 0.35rem 0 !important;
+        display: flex !important;
+        justify-content: space-between !important;
+        align-items: center !important;
+        border-bottom: 1px solid #f7fafc !important;
+
+        &:last-child {
+            border-bottom: none !important;
+        }
+
+        &::before {
+            content: attr(data-label);
+            font-weight: 600 !important;
+            color: $dark !important;
+            font-size: 0.8rem !important;
+            flex: 1 !important;
+        }
+    }
+
+    // Адаптация кнопок-переключателей для мобильных
+    .btn-group .btn {
+        font-size: 0.8rem !important;
+        padding: 0.3rem 0.6rem !important;
+    }
+}
